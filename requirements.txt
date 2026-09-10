@@ -1,0 +1,4 @@
+# The UI itself needs only Gradio. Everything else (mlx, the SA3 scripts,
+# model weights) comes from the stable-audio-3 optimized/mlx install this
+# UI is dropped into — see the README prerequisites.
+gradio>=4.15

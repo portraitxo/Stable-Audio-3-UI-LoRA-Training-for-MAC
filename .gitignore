@@ -1,0 +1,28 @@
+# Never commit these — they're large, machine-specific, or not yours to ship.
+
+# Model weights / caches (Stability AI's — do not redistribute)
+*.npz
+*.safetensors
+models/
+
+# Encoded datasets and generated audio
+*.npy
+*.wav
+*.mp3
+output/
+latents*/
+*-latents/
+my-latents*/
+
+# Training logs / telemetry
+*.log
+loss_by_timestep.bin
+
+# Python environments
+.venv/
+venv/
+__pycache__/
+*.pyc
+
+# macOS
+.DS_Store
