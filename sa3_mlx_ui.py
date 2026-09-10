@@ -46,6 +46,152 @@ OUT_DIR = HERE / "output"
 RUNS_DIR = OUT_DIR / "runs"
 OUT_DIR.mkdir(exist_ok=True)
 
+# --------------------------------------------------------------------------- #
+# Look & feel — black + neon arcade (Pac-Man palette, punk edges)
+# --------------------------------------------------------------------------- #
+ARCADE_THEME = gr.themes.Base(
+    primary_hue="yellow",
+    secondary_hue="cyan",
+    neutral_hue="gray",
+    font=[gr.themes.GoogleFont("Share Tech Mono"), "monospace"],
+    font_mono=[gr.themes.GoogleFont("Share Tech Mono"), "monospace"],
+)
+
+ARCADE_CSS = """
+@import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&family=Share+Tech+Mono&display=swap');
+
+/* Palette: PAC yellow #FFE500 · Inky cyan #00E5FF · Pinky #FF3EC8 ·
+   Blinky red #FF1744 · Clyde orange #FF9800 · phosphor green #8CFF6B */
+:root, .gradio-container, .dark {
+  --body-background-fill: #000000;
+  --background-fill-primary: #050507;
+  --background-fill-secondary: #030304;
+  --block-background-fill: #0a0a10;
+  --block-border-color: rgba(0,229,255,.35);
+  --block-label-text-color: #00E5FF;
+  --block-title-text-color: #FFE500;
+  --body-text-color: #E6FBFF;
+  --body-text-color-subdued: #6fd0da;
+  --border-color-primary: rgba(0,229,255,.35);
+  --border-color-accent: #FF3EC8;
+  --input-background-fill: #08080c;
+  --input-border-color: #12333a;
+  --input-border-color-focus: #FF3EC8;
+  --button-primary-background-fill: #FFE500;
+  --button-primary-background-fill-hover: #FFF25C;
+  --button-primary-text-color: #000000;
+  --button-primary-border-color: #FFE500;
+  --button-secondary-background-fill: #0a0a10;
+  --button-secondary-text-color: #00E5FF;
+  --button-secondary-border-color: #00E5FF;
+  --button-cancel-background-fill: #FF1744;
+  --button-cancel-text-color: #000000;
+  --color-accent: #FF3EC8;
+  --link-text-color: #00E5FF;
+  --slider-color: #FFE500;
+}
+
+.gradio-container {
+  background: #000 !important;
+  font-family: 'Share Tech Mono', monospace !important;
+}
+
+/* faint CRT scanlines over everything */
+.gradio-container::after {
+  content: ""; position: fixed; inset: 0; z-index: 9999; pointer-events: none;
+  background: repeating-linear-gradient(
+    0deg, rgba(0,0,0,0) 0 2px, rgba(0,0,0,.22) 2px 3px);
+  opacity: .5;
+}
+
+/* Arcade display headings */
+h1 {
+  font-family: 'Press Start 2P', monospace !important;
+  font-size: 20px !important; line-height: 2.2 !important;
+  color: #FFE500 !important; text-transform: uppercase; letter-spacing: 1px;
+  text-shadow: 0 0 2px rgba(255,229,0,.5), 0 0 6px rgba(255,152,0,.25);
+  display: inline-block; transform: scaleY(1.4); transform-origin: bottom left;
+  margin: .4em 0 1em !important;
+}
+h2, h3 {
+  font-family: 'Press Start 2P', monospace !important;
+  font-size: 12px !important; line-height: 2.4 !important;
+  color: #7FEFFF !important; letter-spacing: .5px;
+  text-shadow: 0 0 2px rgba(0,229,255,.35);
+  display: inline-block; transform: scaleY(1.35); transform-origin: bottom left;
+  margin: 1em 0 .7em !important;
+}
+.prose, .prose p, .prose li, .md, label, span, p { letter-spacing: .3px; }
+
+/* Buttons = arcade cabinet keys */
+button {
+  font-family: 'Press Start 2P', monospace !important;
+  font-size: 10px !important; letter-spacing: .5px; text-transform: uppercase;
+  border-radius: 2px !important; border-width: 2px !important;
+  padding-top: 14px !important; padding-bottom: 14px !important;
+  transition: box-shadow .12s ease, filter .12s ease;
+}
+button > * { display: inline-block; transform: scaleY(1.35); }
+button.primary, button[variant="primary"] {
+  box-shadow: 0 0 10px rgba(255,229,0,.55), inset 0 0 8px rgba(255,255,255,.25);
+}
+button.stop, button[variant="stop"] {
+  box-shadow: 0 0 10px rgba(255,23,68,.6);
+}
+
+/* Clyde-orange accent button (Use selected checkpoint) */
+.clyde-btn button, button.clyde-btn {
+  background: #FF9800 !important;
+  color: #000 !important;
+  border-color: #FF9800 !important;
+  box-shadow: 0 0 10px rgba(255,152,0,.55), inset 0 0 8px rgba(255,255,255,.2) !important;
+}
+.clyde-btn button:hover, button.clyde-btn:hover {
+  background: #FFB033 !important;
+  box-shadow: 0 0 18px rgba(255,152,0,.9) !important;
+}
+button:hover { filter: brightness(1.12); }
+button.primary:hover { box-shadow: 0 0 18px rgba(255,229,0,.9); }
+button.stop:hover { box-shadow: 0 0 18px rgba(255,23,68,.95); }
+
+/* Inputs = phosphor-green terminal text */
+input, textarea, select {
+  font-family: 'Share Tech Mono', monospace !important;
+  color: #8CFF6B !important; background: #08080c !important;
+  border-radius: 2px !important;
+}
+input:focus, textarea:focus, select:focus {
+  border-color: #FF3EC8 !important;
+  box-shadow: 0 0 10px rgba(255,62,200,.5) !important;
+}
+textarea { text-shadow: 0 0 4px rgba(140,255,107,.35); }
+
+/* Blocks = glowing cabinet panels */
+.block, .form, .gr-box, .gr-panel {
+  border: 1px solid rgba(0,229,255,.30) !important;
+  box-shadow: 0 0 14px rgba(0,229,255,.07), inset 0 0 26px rgba(0,0,0,.6) !important;
+  border-radius: 4px !important;
+}
+
+/* Tabs */
+.tab-nav button {
+  font-family: 'Press Start 2P', monospace !important;
+  font-size: 10px !important; color: #6fd0da !important;
+  border: none !important; box-shadow: none !important;
+}
+.tab-nav button.selected {
+  color: #FFE500 !important;
+  border-bottom: 2px solid #FFE500 !important;
+  text-shadow: 0 0 3px rgba(255,229,0,.5);
+}
+
+/* Labels */
+label span { color: #00E5FF !important; text-transform: uppercase; letter-spacing: .5px; }
+
+/* Slider track glow */
+input[type=range]::-webkit-slider-thumb { box-shadow: 0 0 8px #FFE500; }
+"""
+
 ANSI = re.compile(r"\x1b\[[0-9;]*m")  # strip terminal colour codes from logs
 
 DIT_CHOICES = ["medium", "sm-music", "sm-sfx"]
@@ -327,11 +473,12 @@ def use_checkpoint(ck):
 # --------------------------------------------------------------------------- #
 # UI
 # --------------------------------------------------------------------------- #
-with gr.Blocks(title="Stable Audio 3 — MLX (local)") as demo:
+with gr.Blocks(title="SA3 · MLX ARCADE") as demo:
     gr.Markdown(
-        "# Stable Audio 3 · MLX (local)\n"
+        "# ► STABLE AUDIO 3 · MLX ◄\n"
+        "### insert sound · generate + train loras · all local\n"
         "Runs entirely on your Mac via the local `.venv`. "
-        "First run of each model downloads its weights from Hugging Face.\n"
+        "First run of each model downloads its weights from Hugging Face. "
         "**Tip:** don't run generation and training at the same time — they'd "
         "compete for the GPU."
     )
@@ -457,7 +604,8 @@ with gr.Blocks(title="Stable Audio 3 — MLX (local)") as demo:
                     with gr.Row():
                         ckpt_dropdown = gr.Dropdown([], label="Checkpoints", interactive=True)
                         refresh_btn = gr.Button("Refresh")
-                    use_ckpt_btn = gr.Button("Use selected checkpoint in Generate tab →")
+                    use_ckpt_btn = gr.Button("Use selected checkpoint in Generate tab →",
+                                             elem_classes="clyde-btn")
 
             gr.Markdown(
                 "Guidance: ~10k steps is a reasonable target (per Underfit's own docs — "
@@ -488,4 +636,4 @@ with gr.Blocks(title="Stable Audio 3 — MLX (local)") as demo:
 
 
 if __name__ == "__main__":
-    demo.queue(default_concurrency_limit=4).launch()
+    demo.queue(default_concurrency_limit=4).launch(theme=ARCADE_THEME, css=ARCADE_CSS)
