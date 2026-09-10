@@ -565,7 +565,7 @@ with gr.Blocks(title="SA3 · MLX ARCADE") as demo:
                         placeholder="/Users/you/pxo-train-clips  (a folder of audio files)")
                     t_latents_dir = gr.Textbox(
                         label="Latents output folder",
-                        value=str(pathlib.Path("~/my-latents").expanduser()))
+                        placeholder="e.g. ~/my-latents  (where the encoded latents get written)")
                     t_codec = gr.Dropdown(DECODER_CHOICES, value="same-s",
                                           label="Codec (--codec) · same-s for sm-music/sm-sfx, same-l for medium")
                     t_trigger = gr.Textbox(
@@ -583,7 +583,7 @@ with gr.Blocks(title="SA3 · MLX ARCADE") as demo:
                                         label="Model (--dit) · sm-music = fast first run")
                     t_train_latents = gr.Textbox(
                         label="Latents folder (--latents-dir)",
-                        value=str(pathlib.Path("~/my-latents").expanduser()))
+                        placeholder="e.g. ~/my-latents  (the folder you encoded into)")
                     t_name = gr.Textbox(label="Run name (--name)", value="album")
                     with gr.Row():
                         t_rank = gr.Slider(2, 64, value=16, step=1, label="Rank (--rank)")
