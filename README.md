@@ -12,11 +12,22 @@ and **train LoRAs on Apple Silicon**, from a browser tab, without the terminal.
 
 ![Stable Audio 3 MLX UI — Train LoRA tab](docs/screenshot2.png)
 
+## What's new
+
+**Blend up to 4 LoRAs at once.** The Generate tab's LoRA panel is now four rows
+instead of one. Each row takes a checkpoint, its own **strength**, and an
+optional **steps** range, so you can stack a texture LoRA over a rhythm LoRA,
+dial each one in separately, and let the base model keep control of the parts
+you don't want overwritten. The app also checks every checkpoint's recorded base
+model before it runs and tells you if one doesn't match the selected DiT —
+instead of letting the CLI fail with a shape error partway through.
+
 ## What it does
 
 - **Generate tab** — text-to-audio, audio-to-audio, and inpainting, with CFG /
-  negative-prompt / APG controls and optional **LoRA loading** (with a strength
-  slider).
+  negative-prompt / APG controls and **multi-LoRA loading** — blend up to **4**
+  adapters at once, each with its own strength and step range (see
+  [Blending LoRAs](#blending-loras)).
 - **Train LoRA tab** — a two-step workflow:
   1. **Encode** a folder of audio into latents (once).
   2. **Train** a LoRA against those latents (as many times as you like), with a
@@ -62,6 +73,31 @@ cd ~/stable-audio-3/optimized/mlx
 Then open http://127.0.0.1:7860. On macOS you can instead `chmod +x
 sa3-ui.command` and double-click it.
 
+## Blending LoRAs
+
+The **LoRA — blend up to 4** accordion on the Generate tab has four identical
+rows. Fill in as many as you want and leave the rest empty:
+
+| Field | What it does |
+| --- | --- |
+| **checkpoint** | Path to a `.safetensors` LoRA. The **Train LoRA** tab's "use checkpoint" button drops one into the first empty row. |
+| **strength** | How hard that adapter pulls (0–2). Lower it when a LoRA is overpowering the others or sounds too much like its training data. |
+| **steps** | Which denoising steps the LoRA applies on — `2-8`, `2-`, `-4`, or a single `3`. Empty means all steps. |
+
+The **Default strength** slider above the rows sets `--lora-strength` for the
+run; per-row strengths override it.
+
+The **steps** range is the useful lever when you stack adapters. Skipping the
+early steps (e.g. `3-`) lets the base model lay down structure and form before
+the LoRA colors it in — often the difference between a blend that sounds musical
+and one that collapses into training-data mush. Conversely, `-4` applies a LoRA
+only while the broad shape is being decided and leaves the detail alone.
+
+**All loaded LoRAs must be trained on the same base model as the one you're
+generating with** — you can't mix a `medium` LoRA with a small model, or vice
+versa. The UI reads each checkpoint's metadata and stops with an explanation
+before launching, so a mismatch costs you a message instead of a crash.
+
 ## Notes & gotchas
 
 - **Don't generate and train at the same time** — both use the GPU and will
@@ -71,6 +107,9 @@ sa3-ui.command` and double-click it.
 - **Match the model to its codec/latents.** `sm-music`/`sm-sfx` pair with the
   `same-s` codec; `medium` pairs with `same-l`. Latents encoded for one won't
   train the other. Encode into a separate folder per model.
+- **LoRAs can't cross model families.** Every LoRA loaded in one generation
+  must match the selected DiT's base (all `medium`, or all small). The UI checks
+  this for you before running.
 - **`medium` is memory-hungry.** Training on full-length latents can exhaust GPU
   memory even on large Macs. The **crop length** control defaults to a small
   value for this reason; raise it only if training is stable.
