@@ -21,7 +21,8 @@ same .venv the ./sa3 wrapper uses.
 Generation flags (confirmed against sa3_mlx.py):
   --prompt --negative-prompt --dit --decoder --seconds --steps --seed
   --cfg --apg --init-audio --init-noise-level --inpaint-range
-  --dit-dtype --free-models/--no-free-models --lora --lora-strength --out
+  --dit-dtype --free-models/--no-free-models --lora (repeatable: path
+     [strength=S] [steps=RANGE]) --lora-strength --out
 Training flags (confirmed against lora_train_mlx.py --help):
   pre_encode_mlx.py: --audio-dir --output-dir --codec --max-duration
   lora_train_mlx.py: --dit --latents-dir --lr --name --adapter-type
@@ -225,13 +226,38 @@ def suggest_codec(dit):
     return gr.update(value=SUGGESTED_CODEC.get(dit, "same-s"))
 
 
+# maps the DiT choice to the base_model string recorded in checkpoint metadata
+DIT_TO_BASE = {"medium": "sa3-medium", "sm-music": "sa3-sm-music", "sm-sfx": "sa3-sm-sfx"}
+
+
+def lora_base_model(path):
+    """Read the base_model recorded in a .safetensors LoRA's metadata.
+
+    Returns the base string (e.g. 'sa3-medium') or None if unreadable.
+    Lets us catch a small/medium mismatch before the CLI throws a shape error.
+    """
+    try:
+        import struct
+        p = pathlib.Path(path).expanduser()
+        with open(p, "rb") as fh:
+            n = struct.unpack("<Q", fh.read(8))[0]
+            hdr = json.loads(fh.read(n))
+        cfg = hdr.get("__metadata__", {}).get("lora_config")
+        if not cfg:
+            return None
+        return json.loads(cfg).get("base_model")
+    except Exception:  # noqa: BLE001
+        return None
+
+
 # --------------------------------------------------------------------------- #
 # generation
 # --------------------------------------------------------------------------- #
 def generate(prompt, negative_prompt, dit, decoder, seconds, steps,
              use_random_seed, seed, cfg, apg,
              init_audio, init_noise_level, inpaint_range,
-             dit_dtype, free_models, lora_path, lora_strength):
+             dit_dtype, free_models, default_strength,
+             p1, s1, r1, p2, s2, r2, p3, s3, r3, p4, s4, r4):
 
     if not PY.exists():
         return None, ("ERROR: .venv not found at\n  %s\n\n"
@@ -242,6 +268,25 @@ def generate(prompt, negative_prompt, dit, decoder, seconds, steps,
         return None, ("A LoRA training run is active in the Train tab. Running a "
                        "generation now would compete for the GPU (the Metal 'shared "
                        "event' error). Wait for training to finish or Stop it first.")
+
+    # collect the LoRA rows that have a path
+    rows = [(p1, s1, r1), (p2, s2, r2), (p3, s3, r3), (p4, s4, r4)]
+    loras = [(p.strip(), s, (r or "").strip()) for (p, s, r) in rows if p and p.strip()]
+
+    # guard: every LoRA must match the selected model's base, and each other
+    want_base = DIT_TO_BASE.get(dit)
+    for (path, _s, _r) in loras:
+        if not pathlib.Path(path).expanduser().exists():
+            return None, f"LoRA not found:\n  {path}"
+        b = lora_base_model(path)
+        if b and want_base and b != want_base:
+            return None, (
+                "LoRA / model mismatch — this would fail with a shape error.\n\n"
+                f"  Selected model (--dit {dit}) expects base: {want_base}\n"
+                f"  But this LoRA was trained on: {b}\n    {pathlib.Path(path).name}\n\n"
+                "All loaded LoRAs must match the selected model. Switch the DiT to the "
+                "matching model, or choose LoRAs trained on this one. (You can't mix a "
+                "small-model LoRA with the medium model, or vice versa.)")
 
     ts = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
     out_path = OUT_DIR / f"ui_{ts}.wav"
@@ -256,6 +301,7 @@ def generate(prompt, negative_prompt, dit, decoder, seconds, steps,
         "--cfg", str(float(cfg)),
         "--apg", str(float(apg)),
         "--dit-dtype", dit_dtype,
+        "--lora-strength", str(float(default_strength)),
         "--out", str(out_path),
     ]
     cmd.append("--free-models" if free_models else "--no-free-models")
@@ -269,10 +315,15 @@ def generate(prompt, negative_prompt, dit, decoder, seconds, steps,
                 "--init-noise-level", str(float(init_noise_level))]
         if inpaint_range and inpaint_range.strip():
             cmd += ["--inpaint-range", inpaint_range.strip()]
-    if lora_path and lora_path.strip():
-        cmd += ["--lora", lora_path.strip()]
-        if lora_strength is not None and float(lora_strength) != 1.0:
-            cmd += ["--lora-strength", str(float(lora_strength))]
+
+    # one repeated --lora per row: path [strength=S] [steps=RANGE]
+    for (path, strength, rng) in loras:
+        entry = ["--lora", path]
+        if strength is not None:
+            entry.append(f"strength={float(strength)}")
+        if rng:
+            entry.append(f"steps={rng}")
+        cmd += entry
 
     header = "Running:\n  " + _readable_cmd(cmd) + "\n" + ("-" * 60) + "\n"
 
@@ -499,13 +550,25 @@ with gr.Blocks(title="SA3 · MLX ARCADE") as demo:
                         seconds = gr.Slider(1, 380, value=30, step=1, label="Seconds (--seconds)")
                         steps = gr.Slider(1, 8, value=8, step=1, label="Steps (--steps)")
 
-                    with gr.Accordion("LoRA (optional)", open=False):
-                        gr.Markdown("Load a trained adapter. The **Train LoRA** tab can drop a "
-                                    "checkpoint path in here for you.")
-                        lora_path = gr.Textbox(label="LoRA checkpoint (--lora)",
-                                               placeholder="output/runs/<name>/<uuid>/checkpoints/<name>-step=….safetensors")
-                        lora_strength = gr.Slider(0.0, 1.5, value=1.0, step=0.05,
-                                                  label="LoRA strength (--lora-strength) · lower if it sounds too much like the data")
+                    with gr.Accordion("LoRA — blend up to 4 (optional)", open=False):
+                        gr.Markdown(
+                            "Load one or more trained adapters. Each row: a checkpoint path, "
+                            "**strength**, and an optional **steps** range (e.g. `2-8`, `2-`, "
+                            "`-4`, or `3`) to apply the LoRA only on some denoising steps — "
+                            "skipping early steps lets the base model set structure. "
+                            "**All LoRAs must match the selected model** (all medium, or all "
+                            "small) — the app checks and warns before running. The **Train LoRA** "
+                            "tab can drop a checkpoint into the first empty row.")
+                        default_strength = gr.Slider(0.0, 2.0, value=1.0, step=0.05,
+                                                     label="Default strength (--lora-strength) · used for any row left at default")
+                        lora_paths, lora_strengths, lora_steps = [], [], []
+                        for i in range(1, 5):
+                            with gr.Row():
+                                lp = gr.Textbox(label=f"LoRA {i} — checkpoint (.safetensors)", scale=6,
+                                                placeholder="output/runs/<name>/<uuid>/checkpoints/<name>-step=….safetensors")
+                                ls = gr.Slider(0.0, 2.0, value=1.0, step=0.05, label="strength", scale=3)
+                                lr = gr.Textbox(label="steps", scale=2, placeholder="all")
+                            lora_paths.append(lp); lora_strengths.append(ls); lora_steps.append(lr)
 
                     with gr.Accordion("Guidance (CFG)", open=False):
                         gr.Markdown("`--cfg 1.0` = off. Negative prompt and APG only apply when CFG ≠ 1.0.")
@@ -541,7 +604,11 @@ with gr.Blocks(title="SA3 · MLX ARCADE") as demo:
                 inputs=[prompt, negative_prompt, dit, decoder, seconds, steps,
                         use_random_seed, seed, cfg, apg,
                         init_audio, init_noise_level, inpaint_range,
-                        dit_dtype, free_models, lora_path, lora_strength],
+                        dit_dtype, free_models, default_strength,
+                        lora_paths[0], lora_strengths[0], lora_steps[0],
+                        lora_paths[1], lora_strengths[1], lora_steps[1],
+                        lora_paths[2], lora_strengths[2], lora_steps[2],
+                        lora_paths[3], lora_strengths[3], lora_steps[3]],
                 outputs=[audio_out, log_out],
             )
 
@@ -628,7 +695,7 @@ with gr.Blocks(title="SA3 · MLX ARCADE") as demo:
                             outputs=train_status)
             stop_btn.click(stop_training, outputs=train_status)
             refresh_btn.click(refresh_checkpoints, outputs=ckpt_dropdown)
-            use_ckpt_btn.click(use_checkpoint, inputs=ckpt_dropdown, outputs=lora_path)
+            use_ckpt_btn.click(use_checkpoint, inputs=ckpt_dropdown, outputs=lora_paths[0])
 
             # live status: poll every 3s
             timer = gr.Timer(3.0)
