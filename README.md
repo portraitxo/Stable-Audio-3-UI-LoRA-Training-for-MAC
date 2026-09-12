@@ -8,7 +8,7 @@ and **train LoRAs on Apple Silicon**, from a browser tab, without the terminal.
 > with or endorsed by Stability AI. It ships no model code and no weights — it
 > just drives the scripts already in your local SA3 install.
 
-![Stable Audio 3 MLX UI — Generate tab](docs/screenshot3.png)
+![Stable Audio 3 MLX UI — Generate tab](docs/screenshot4.png)
 
 ![Stable Audio 3 MLX UI — Train LoRA tab](docs/screenshot2.png)
 
