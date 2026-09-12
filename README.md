@@ -10,7 +10,7 @@ and **train LoRAs on Apple Silicon**, from a browser tab, without the terminal.
 
 ![Stable Audio 3 MLX UI — Generate tab](docs/screenshot4.png)
 
-![Stable Audio 3 MLX UI — Train LoRA tab](docs/screenshot2.png)
+![Stable Audio 3 MLX UI — Train LoRA tab](docs/screenshot.png)
 
 ## What's new
 
