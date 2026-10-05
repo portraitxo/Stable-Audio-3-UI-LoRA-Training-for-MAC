@@ -117,6 +117,19 @@ printed in the Terminal rather than assuming 7860.
 | `Failed to create Metal shared event` | You're generating and training at the same time. Run one at a time. |
 | Model weights download every time / fills the disk | Weights land in the HuggingFace cache and are symlinked into `models/mlx/`. Don't delete that cache between runs. |
 
+## Using Underfit on a Mac
+
+[Underfit](https://github.com/dada-bots/underfit) is the full LoRA-training
+dashboard, and on Apple Silicon it drives the **same** MLX trainer this UI does.
+Its Apple-Silicon quickstart leaves out a few things a fresh Mac needs, and
+`UNDERFIT_ENGINE=mlx ./run.sh` doesn't actually put the dashboard on MLX — the
+dashboard never reads that variable.
+
+**[→ Underfit on a Mac: the steps its README leaves out](docs/underfit-on-mac.md)**
+— a full fresh-laptop install, the strict sibling-folder rule, why the
+HuggingFace 401 happens (and why the MLX route avoids it), the ports, and an
+error-message index.
+
 ## Blending LoRAs
 
 The **LoRA — blend up to 4** accordion on the Generate tab has four identical
