@@ -65,9 +65,8 @@ Free disk space you'll need, depending on which model you use:
 | `medium`, generating only | ~6.5 GB |
 | …and training LoRAs on it | ~9.2 GB (its base checkpoint is 2.8 GB) |
 
-Start with `sm-music` if you're installing on someone else's laptop or on a
-teaching machine. It's small, fast, and enough to prove the whole pipeline works.
-You can add `medium` later with one command.
+Start with `sm-music`. It's small, fast, and enough to prove the whole pipeline
+works. You can add `medium` later with one command.
 
 **You do not need a HuggingFace account, a login, or a token.** The MLX weights
 live in `stabilityai/stable-audio-3-optimized`, which is not license-gated. (If
