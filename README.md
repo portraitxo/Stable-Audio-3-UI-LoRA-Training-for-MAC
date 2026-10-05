@@ -37,38 +37,180 @@ instead of letting the CLI fail with a shape error partway through.
 
 Everything runs locally on your Mac via the SA3 `.venv`. Nothing is uploaded.
 
-## Prerequisites
+## Prerequisites — install Stable Audio 3 first
 
-- An **Apple Silicon Mac** (M1 or newer). MLX is Metal-backed — Intel Macs can't
-  run this.
-- **~9 GB of free disk space** for the Stable Audio 3 weights (more if you
-  download several DiT bundles), plus room for your latents and checkpoints.
-- **Apple's Command Line Tools**, which is where `git` comes from. If
-  `git --version` errors out, run `xcode-select --install` and let it finish
-  before going on.
-- A working **Stable Audio 3 MLX** install — step 1 below sets that up. This UI
-  ships no model code and no weights. It drives the scripts already in your SA3
-  install (`sa3_mlx.py`, `pre_encode_mlx.py`, `lora_train_mlx.py`) using the
-  `.venv` sitting next to them, so it assumes the standard
-  `stable-audio-3/optimized/mlx/` layout.
+This UI is a wrapper. It ships no model code and no weights: it drives the
+scripts inside a working **Stable Audio 3 MLX** install, using the `.venv` that
+install creates. So Stable Audio 3 has to be working *before* you copy the UI in.
+
+Work through this whole section first. Every command is meant to be pasted into
+**Terminal** exactly as written, one block at a time.
+
+### 1. Check the Mac can run it
+
+```bash
+uname -m
+```
+
+Must print **`arm64`** (Apple Silicon, M1 or later). If it prints `x86_64` on an
+M-series Mac, your Terminal is running under Rosetta — use a normal Terminal
+window. On an actual Intel Mac, none of this will work: MLX is Metal-only.
+
+Free disk space you'll need, depending on which model you use:
+
+| What you're doing | Download |
+| --- | --- |
+| `sm-music` or `sm-sfx`, generating only | ~1.9 GB (1.3 GB model + 0.5 GB text encoder) |
+| …and training LoRAs on it | ~2.8 GB (the trainer adds a 0.9 GB base checkpoint) |
+| `medium`, generating only | ~6.5 GB |
+| …and training LoRAs on it | ~9.2 GB (its base checkpoint is 2.8 GB) |
+
+Start with `sm-music` if you're installing on someone else's laptop or on a
+teaching machine. It's small, fast, and enough to prove the whole pipeline works.
+You can add `medium` later with one command.
+
+**You do not need a HuggingFace account, a login, or a token.** The MLX weights
+live in `stabilityai/stable-audio-3-optimized`, which is not license-gated. (If
+you see a `401 Unauthorized` or `GatedRepoError` anywhere, you're running some
+*other* Stable Audio installer that pulls the gated PyTorch weights — not this
+one.)
+
+### 2. Install Apple's Command Line Tools
+
+This is where `git` comes from. Skip if `git --version` already prints a version.
+
+```bash
+xcode-select --install
+```
+
+A dialog appears — click **Install** and wait for it to finish (a few minutes).
+Then check:
+
+```bash
+git --version
+```
+
+### 3. Download Stable Audio 3
+
+```bash
+cd ~
+git clone https://github.com/Stability-AI/stable-audio-3
+```
+
+That makes `~/stable-audio-3`. Keep that name and location if you can — the
+commands below and the launcher's default both assume it.
+
+### 4. Run Stable Audio 3's installer
+
+```bash
+cd ~/stable-audio-3/optimized/mlx
+./install.sh -y --download sm-music
+```
+
+The two flags matter on other people's machines: `-y` answers the "install uv?"
+prompt for you, and `--download sm-music` picks the model bundle up front
+instead of stopping at an interactive menu. For the bigger model, or both:
+
+```bash
+./install.sh -y --download medium
+./install.sh -y --download sm-music,medium
+```
+
+Re-running is safe — it skips anything already present.
+
+What it does, so you know what you're watching: installs `uv` if missing,
+creates `.venv` with Python 3.11 inside `optimized/mlx`, installs the MLX
+dependencies into it, notes whether `ffmpeg` is present (optional — it's fine
+without), then downloads the weights you asked for from HuggingFace.
+
+### 5. If `./install.sh` doesn't finish
+
+It isn't reliable on a fresh machine. Match the symptom:
+
+| What you see | What to do |
+| --- | --- |
+| `uv was installed but isn't on PATH` | Quit Terminal, open a new window, and re-run the same command. The installer only adds `uv` to the PATH of the shell it's running in. |
+| It stops at a menu asking which models to download | You left off `--download`. Press Ctrl-C and re-run with `-y --download sm-music`. |
+| `curl is required` / the `uv` install fails | Install `uv` with Homebrew instead: `brew install uv`, then re-run the command in step 4. No Homebrew? Get it at https://brew.sh first. |
+| A download dies partway, or the weights stall | Re-run the step-4 command. Finished files are skipped, so it picks up where it stopped. |
+| `warning: this stack is Apple-Silicon-only` | See step 1 — Rosetta, or an Intel Mac. |
+| Anything else, or it just won't go | Use the by-hand path below. |
+
+**By-hand path** — this does exactly what `install.sh` does, without relying on
+it. It needs Homebrew (https://brew.sh):
+
+```bash
+# A Python the MLX stack accepts (3.10 or newer)
+brew install python@3.11
+
+# Build the virtual environment yourself
+cd ~/stable-audio-3/optimized/mlx
+"$(brew --prefix)/bin/python3.11" -m venv .venv
+./.venv/bin/python -m pip install --upgrade pip
+./.venv/bin/python -m pip install -r requirements.txt
+
+# Download the weights (bundle names: sm-music, sm-sfx, medium)
+./.venv/bin/python scripts/install.py --download sm-music
+```
+
+All of those dependencies are prebuilt wheels — nothing compiles, so there's
+nothing here that can fail on a missing compiler.
+
+If even the weight download misbehaves, skip it. Stable Audio 3 fetches any
+missing weight file from HuggingFace the first time it needs it, so a venv with
+the dependencies installed is enough to continue — the first generation will
+just take longer while it downloads.
+
+### 6. Prove Stable Audio 3 works before touching the UI
+
+Don't skip this. If this command produces a file, the UI will work; if it
+doesn't, the UI can only fail in a more confusing way.
+
+```bash
+cd ~/stable-audio-3/optimized/mlx
+./.venv/bin/python scripts/sa3_mlx.py \
+    --prompt "short warm techno loop" --dit sm-music --decoder same-s \
+    --seconds 5 --out check.wav
+```
+
+First run is slow — it loads (and possibly downloads) the text encoder and the
+model. When it finishes you'll have `~/stable-audio-3/optimized/mlx/output/check.wav`.
+Play it:
+
+```bash
+afplay ~/stable-audio-3/optimized/mlx/output/check.wav
+```
+
+Now go to [Install](#install).
+
+### 7. Extra notes if you plan to train LoRAs
+
+Training is the reason most people are here, so two things to know before you
+start:
+
+- **Training downloads one more file.** LoRA training runs against the model's
+  **base** checkpoint, not the one generation uses, and it isn't part of any
+  install bundle — the trainer fetches it on your first training run (0.9 GB for
+  `sm-music`/`sm-sfx`, 2.8 GB for `medium`). Nothing to do in advance; just
+  don't be surprised by a download when you first hit Train, and leave the disk
+  space for it.
+- **Match the codec to the model.** Encode your audio with `same-s` for
+  `sm-music`/`sm-sfx`, and `same-l` for `medium`. Latents encoded for one won't
+  train the other, so use a separate output folder per model. The UI exposes
+  this choice on the Train tab — it's the single most common way a first
+  training run goes wrong.
+
+The underlying command-line trainer is documented at
+[optimized/mlx → LoRA training](https://github.com/Stability-AI/stable-audio-3/tree/main/optimized/mlx#lora-training).
+This UI drives those same scripts, so that page is the reference for what every
+option actually does.
 
 ## Install
 
-Three copy-paste blocks. Every path is absolute (`~/…`), so it doesn't matter
-which folder your Terminal happens to be in.
+Stable Audio 3 working? Two blocks. Every path is absolute (`~/…`), so it
+doesn't matter which folder Terminal is in.
 
-**1 — Install Stable Audio 3 for Mac** (skip if you already have it):
-
-```bash
-cd ~ && git clone https://github.com/Stability-AI/stable-audio-3
-cd ~/stable-audio-3/optimized/mlx && ./install.sh
-```
-
-The installer sets up `uv`, creates the `.venv`, and asks which model bundles to
-download. Pick at least one — `sm-music` is the fast one, `medium` is the
-higher-quality one.
-
-**2 — Download this UI and copy it into that folder:**
+**1 — Download this UI and copy it into your Stable Audio 3 folder:**
 
 ```bash
 cd ~ && git clone https://github.com/portraitxo/Stable-Audio-3-UI-LoRA-Training-for-MAC sa3-mlx-ui
@@ -76,15 +218,18 @@ cp ~/sa3-mlx-ui/sa3_mlx_ui.py ~/sa3-mlx-ui/sa3-ui.command ~/stable-audio-3/optim
 chmod +x ~/stable-audio-3/optimized/mlx/sa3-ui.command
 ```
 
-**3 — Install Gradio into the SA3 venv:**
+(The `git clone` is the step people miss. Without it there's no
+`sa3_mlx_ui.py` to copy, and `cp` fails with `No such file or directory`.)
+
+**2 — Install Gradio into the Stable Audio 3 environment:**
 
 ```bash
 ~/stable-audio-3/optimized/mlx/.venv/bin/python -m pip install gradio
 ```
 
-Use the `.venv`'s own `pip`, as above — not `uv pip install`. SA3's installer
-only puts `uv` on your PATH for the length of its own run, so in a fresh
-Terminal window `uv` is usually `command not found`.
+Use the `.venv`'s own `pip`, exactly as written — not `uv pip install`. Stable
+Audio 3's installer only puts `uv` on the PATH for the length of its own run, so
+in a fresh Terminal window `uv` is usually `command not found`.
 
 (If your `stable-audio-3` lives somewhere other than `~/stable-audio-3`, adjust
 these paths and edit `MLX_DIR` at the top of `sa3-ui.command`.)
@@ -106,12 +251,13 @@ printed in the Terminal rather than assuming 7860.
 
 | What you see | What to do |
 | --- | --- |
-| `cp: sa3_mlx_ui.py: No such file or directory` | The `git clone` in step 2 was skipped, so there's nothing to copy. Run that whole block. |
-| `git: command not found`, or a popup about developer tools | `xcode-select --install`, wait for it to finish, then start at step 1. |
-| `uv: command not found` | Normal in a new Terminal window. Install Gradio with the `.venv` pip from step 3 instead. |
-| `No virtual environment at …/.venv/bin/python` | SA3's own `./install.sh` hasn't been run yet — do step 1. |
-| `ModuleNotFoundError: No module named 'gradio'` | Step 3 didn't run, or it went into a different Python. Re-run it with the full `~/stable-audio-3/optimized/mlx/.venv/bin/python` path. |
+| `cp: sa3_mlx_ui.py: No such file or directory` | The `git clone` in **Install** step 1 was skipped, so there's nothing to copy. Run that whole block. |
+| `git: command not found`, or a popup about developer tools | `xcode-select --install`, wait for it to finish — **Prerequisites** step 2. |
+| `uv: command not found` | Normal in a new Terminal window — the SA3 installer only puts `uv` on its own PATH. Use the `.venv` pip from **Install** step 2, or `brew install uv`. |
+| `No virtual environment at …/.venv/bin/python` | Stable Audio 3 isn't installed yet — **Prerequisites** steps 3–4 (and step 5 if its installer won't finish). |
+| `ModuleNotFoundError: No module named 'gradio'` | **Install** step 2 didn't run, or it went into a different Python. Re-run it with the full `~/stable-audio-3/optimized/mlx/.venv/bin/python` path. |
 | `permission denied: ./sa3-ui.command`, or double-clicking it does nothing | `chmod +x ~/stable-audio-3/optimized/mlx/sa3-ui.command` |
+| `ModuleNotFoundError: No module named 'mlx'`, or the UI starts but every run errors | Stable Audio 3's own install is incomplete. Go back to **Prerequisites** step 6 and get that generating a file first. |
 | `Could not find: …/stable-audio-3/optimized/mlx` (from the launcher) | Your SA3 install is somewhere else — edit `MLX_DIR` at the top of `sa3-ui.command`. |
 | `address already in use` | Another app has port 7860. Quit it, or use whichever 786x URL the Terminal prints. |
 | `Failed to create Metal shared event` | You're generating and training at the same time. Run one at a time. |
@@ -181,9 +327,12 @@ before launching, so a mismatch costs you a message instead of a crash.
 
 ## Requirements
 
-- macOS on Apple Silicon
-- A working `stable-audio-3` `optimized/mlx` install (with its `.venv`)
-- `gradio` (see `requirements.txt`)
+- macOS on Apple Silicon (M1 or later)
+- A working `stable-audio-3` `optimized/mlx` install, with its `.venv` — see
+  [Prerequisites](#prerequisites--install-stable-audio-3-first)
+- ~2 GB of free disk for the smallest model, ~9 GB for `medium` with training
+- `gradio` (see `requirements.txt`) — the only thing this UI adds
+- No HuggingFace account, and no PyTorch
 
 ## Licensing & weights
 

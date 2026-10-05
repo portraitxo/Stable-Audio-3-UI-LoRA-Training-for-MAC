@@ -154,9 +154,9 @@ Either accept the license on HuggingFace, or re-run with `--no-setup`.
 | --- | --- | --- |
 | Underfit dashboard | 8787 | Taken? It moves to 8788, 8789… and prints which (`server.py:8108`). Force one with `UNDERFIT_DASHBOARD_PORT=9000`. |
 | Underfit's per-checkpoint LAUNCH button | 7860+ | `GRADIO_PORT_BASE` (`server.py:505`). |
-| This repo's UI, and SA3's own `./sa3-gradio` | 7860+ | Same range. |
+| This repo's UI | 7860+ | Same range. |
 
-So Underfit's LAUNCH button and this repo's UI compete for 7860. Running both
+So Underfit's LAUNCH button and this repo's UI want the same port. Running both
 at once isn't harmful — Gradio just walks up to the next free port — but the URL
 you expect may belong to the other app. Read the port that's actually printed.
 
