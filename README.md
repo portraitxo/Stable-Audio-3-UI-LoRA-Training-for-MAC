@@ -39,39 +39,83 @@ Everything runs locally on your Mac via the SA3 `.venv`. Nothing is uploaded.
 
 ## Prerequisites
 
-You need a working **Stable Audio 3 MLX** install first (Apple Silicon Mac):
-
-- Stability AI's `stable-audio-3` repo, with the `optimized/mlx` folder set up
-  via its own `./install.sh` (this creates the `.venv` and fetches weights on
-  first use). Follow that project's README for setup.
-- This UI assumes the standard layout: `stable-audio-3/optimized/mlx/` with the
-  `scripts/` folder (`sa3_mlx.py`, `pre_encode_mlx.py`, `lora_train_mlx.py`) and
-  the local `.venv` next to it.
+- An **Apple Silicon Mac** (M1 or newer). MLX is Metal-backed — Intel Macs can't
+  run this.
+- **~9 GB of free disk space** for the Stable Audio 3 weights (more if you
+  download several DiT bundles), plus room for your latents and checkpoints.
+- **Apple's Command Line Tools**, which is where `git` comes from. If
+  `git --version` errors out, run `xcode-select --install` and let it finish
+  before going on.
+- A working **Stable Audio 3 MLX** install — step 1 below sets that up. This UI
+  ships no model code and no weights. It drives the scripts already in your SA3
+  install (`sa3_mlx.py`, `pre_encode_mlx.py`, `lora_train_mlx.py`) using the
+  `.venv` sitting next to them, so it assumes the standard
+  `stable-audio-3/optimized/mlx/` layout.
 
 ## Install
 
-Drop the UI file into your SA3 MLX folder and install Gradio into its venv:
+Three copy-paste blocks. Every path is absolute (`~/…`), so it doesn't matter
+which folder your Terminal happens to be in.
+
+**1 — Install Stable Audio 3 for Mac** (skip if you already have it):
 
 ```bash
-# from this repo
-cp sa3_mlx_ui.py ~/stable-audio-3/optimized/mlx/
-cp sa3-ui.command ~/stable-audio-3/optimized/mlx/   # optional double-click launcher
-cd ~/stable-audio-3/optimized/mlx
-uv pip install gradio     # one-time, into the SA3 .venv
+cd ~ && git clone https://github.com/Stability-AI/stable-audio-3
+cd ~/stable-audio-3/optimized/mlx && ./install.sh
 ```
 
-(If your `stable-audio-3` lives elsewhere, adjust the paths, and edit `MLX_DIR`
-at the top of `sa3-ui.command`.)
+The installer sets up `uv`, creates the `.venv`, and asks which model bundles to
+download. Pick at least one — `sm-music` is the fast one, `medium` is the
+higher-quality one.
+
+**2 — Download this UI and copy it into that folder:**
+
+```bash
+cd ~ && git clone https://github.com/portraitxo/Stable-Audio-3-UI-LoRA-Training-for-MAC sa3-mlx-ui
+cp ~/sa3-mlx-ui/sa3_mlx_ui.py ~/sa3-mlx-ui/sa3-ui.command ~/stable-audio-3/optimized/mlx/
+chmod +x ~/stable-audio-3/optimized/mlx/sa3-ui.command
+```
+
+**3 — Install Gradio into the SA3 venv:**
+
+```bash
+~/stable-audio-3/optimized/mlx/.venv/bin/python -m pip install gradio
+```
+
+Use the `.venv`'s own `pip`, as above — not `uv pip install`. SA3's installer
+only puts `uv` on your PATH for the length of its own run, so in a fresh
+Terminal window `uv` is usually `command not found`.
+
+(If your `stable-audio-3` lives somewhere other than `~/stable-audio-3`, adjust
+these paths and edit `MLX_DIR` at the top of `sa3-ui.command`.)
 
 ## Run
 
 ```bash
-cd ~/stable-audio-3/optimized/mlx
-./.venv/bin/python sa3_mlx_ui.py
+cd ~/stable-audio-3/optimized/mlx && ./.venv/bin/python sa3_mlx_ui.py
 ```
 
-Then open http://127.0.0.1:7860. On macOS you can instead `chmod +x
-sa3-ui.command` and double-click it.
+Then open http://127.0.0.1:7860. Or just double-click `sa3-ui.command` in
+Finder — it does the same thing and opens the browser for you.
+
+Port 7860 is the Gradio default, so other audio UIs tend to want it too. If it's
+already taken, Gradio moves to the next free port (7861, 7862…) — read the URL
+printed in the Terminal rather than assuming 7860.
+
+## Troubleshooting
+
+| What you see | What to do |
+| --- | --- |
+| `cp: sa3_mlx_ui.py: No such file or directory` | The `git clone` in step 2 was skipped, so there's nothing to copy. Run that whole block. |
+| `git: command not found`, or a popup about developer tools | `xcode-select --install`, wait for it to finish, then start at step 1. |
+| `uv: command not found` | Normal in a new Terminal window. Install Gradio with the `.venv` pip from step 3 instead. |
+| `No virtual environment at …/.venv/bin/python` | SA3's own `./install.sh` hasn't been run yet — do step 1. |
+| `ModuleNotFoundError: No module named 'gradio'` | Step 3 didn't run, or it went into a different Python. Re-run it with the full `~/stable-audio-3/optimized/mlx/.venv/bin/python` path. |
+| `permission denied: ./sa3-ui.command`, or double-clicking it does nothing | `chmod +x ~/stable-audio-3/optimized/mlx/sa3-ui.command` |
+| `Could not find: …/stable-audio-3/optimized/mlx` (from the launcher) | Your SA3 install is somewhere else — edit `MLX_DIR` at the top of `sa3-ui.command`. |
+| `address already in use` | Another app has port 7860. Quit it, or use whichever 786x URL the Terminal prints. |
+| `Failed to create Metal shared event` | You're generating and training at the same time. Run one at a time. |
+| Model weights download every time / fills the disk | Weights land in the HuggingFace cache and are symlinked into `models/mlx/`. Don't delete that cache between runs. |
 
 ## Blending LoRAs
 

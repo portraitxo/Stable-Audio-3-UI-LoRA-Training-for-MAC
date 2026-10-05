@@ -21,14 +21,15 @@ cd "$MLX_DIR" 2>/dev/null || {
 PY="$MLX_DIR/.venv/bin/python"
 if [ ! -x "$PY" ]; then
   echo "No virtual environment at $PY"
-  echo "Run ./install.sh inside $MLX_DIR first, then: uv pip install gradio"
+  echo "Run ./install.sh inside $MLX_DIR first, then:"
+  echo "  $PY -m pip install gradio"
   read -r -p "Press return to close."
   exit 1
 fi
 
 if ! "$PY" -c "import gradio" 2>/dev/null; then
   echo "Gradio isn't installed in the .venv. Installing it now..."
-  uv pip install gradio || "$PY" -m pip install gradio
+  "$PY" -m pip install gradio || uv pip install gradio
 fi
 
 # Give the server a moment to start, then open the browser.
